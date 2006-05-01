@@ -1,0 +1,41 @@
+-*-text-*-
+$Header$
+
+What is slowdown?
+
+Often things are just too fast.  For example
+
+	find / -type f -ls | awk -f process.awk
+
+might eat up so much system IO that the system becomes unresponsive.
+This is where slowdown comes into place.  In this case you can write:
+
+	find / -type f -ls | slowdown 50 | awk -f process.awk
+
+which means, only process 20 lines per second.  Also it can be used to
+slowdown processes like my md5backup which often tears down the system
+too hard.  Slowdown shall be the solution to it.
+
+Usage: slowdown delay [process [args..]]
+
+delay is in milliseconds
+
+If the process is missing it acts as a filter from stdin to stdout
+such that it delays the IO the given delay each line or BLKSIZ (4096)
+bytes, whatever comes first.  Also it runs unbuffered, such that it
+writes lines to stdout in a flushed mode.  Always as you expect it.
+
+If process is given, it is started "traced", that is, it is delayed
+each time it does a SYSCALL.  Except from this it just behaves as if
+it is not there and sends all the signals it receives to the child, so
+it's like it isn't there.
+
+That's just the complete idea behind slowdown.
+
+-Tino
+webmaster@scylla-charybdis.com
+http://www.scylla-charybdis.com/
+$Log$
+Revision 1.1  2006-05-01 01:52:30  tino
+A first version which works
+

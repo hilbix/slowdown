@@ -1,0 +1,16 @@
+Slowdown processes or pipes.
+# $Header$
+#
+# $Log$
+# Revision 1.1  2006-05-01 01:52:30  tino
+# A first version which works
+#
+
+Note that there is a similar <A
+HREF="http://freshmeat.net/projects/slowdown/">project called slowdown
+at freshmeat.net</A> running under SunOS and Linux.
+
+My version here is designed for modern Linux only to slowdown pipes
+and processes.  It slowdowns all syscalls, not only the IO ones.
+
+For more please look into <A HREF=slowdown/README>README</A>.
