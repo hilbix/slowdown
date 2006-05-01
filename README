@@ -30,12 +30,37 @@ each time it does a SYSCALL.  Except from this it just behaves as if
 it is not there and sends all the signals it receives to the child, so
 it's like it isn't there.
 
+Also you can attach to other processes by giving the PID as the
+process name in case you do not give any args.
+
 That's just the complete idea behind slowdown.
+
+Note that there is a similar project at freshmeat:
+     http://freshmeat.net/projects/slowdown/
+So if my version does not help you, perhaps the other can.
+
+BUGS:
+-----
+
+- If delay is below the resolution of the system timer, the waits are
+  over-estimated, so the overall delay is too high.  Perhaps a future
+  version fixes this.
+
+- fork()s of the child processes are not followed.  This is the new
+  child processes are not traced as well.  This shall be the default
+  behavior, though.
+
+- If slowdown terminates, the traced process stays in the traced
+  state, so it does stop running.  There shall be an automatic detach
+  somehow.
 
 -Tino
 webmaster@scylla-charybdis.com
 http://www.scylla-charybdis.com/
-$Log$
-Revision 1.1  2006-05-01 01:52:30  tino
-A first version which works
 
+$Log$
+Revision 1.2  2006-05-01 02:26:25  tino
+first dist
+
+Revision 1.1  2006/05/01 01:52:30  tino
+A first version which works
