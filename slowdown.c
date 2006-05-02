@@ -18,9 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * $Log$
- * Revision 1.1  2006-05-01 01:52:30  tino
- * A first version which works
+ * Revision 1.2  2006-05-02 04:14:11  tino
+ * mostly delay improvement, commit for dist
  *
+ * Revision 1.1  2006/05/01 01:52:30  tino
+ * A first version which works
  */
 
 #include <stdio.h>
@@ -34,6 +36,7 @@
 #include <unistd.h>
 
 #include <sys/ptrace.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -85,9 +88,10 @@ status(const char *s, ...)
   fprintf(stderr, "\n");
 }
 
-static int		is_delay;
-static struct timespec	delay;
-static long		sleeps;
+static int			is_delay;
+static struct timespec		delay;
+static unsigned long long	delay_us;
+static long			sleeps;
 
 /* This obviously isn't precise.
  *
@@ -101,13 +105,24 @@ static long		sleeps;
 static int
 do_delay(void)
 {
+#if 0
   struct timespec	elapsed;
+#endif
   int			ret;
+  struct timeval	a, b;
+  static long long	miss_us;
 
   if (!is_delay)
     return 0;
+  if ((miss_us+=delay_us)<0)
+    return 0;
   sleeps++;
-  ret	= nanosleep(&delay, &elapsed);
+  if (gettimeofday(&a, NULL))
+    ex(-1, "gettimeofday");
+  ret	= nanosleep(&delay, NULL);
+  if (gettimeofday(&b, NULL))
+    ex(-1, "gettimeofday");
+  miss_us	-= (b.tv_sec-a.tv_sec)*1000000ull+b.tv_usec-a.tv_usec;
 #if 0
   if (!ret)
     {
@@ -124,14 +139,14 @@ do_delay(void)
 static int
 set_delay(const char *arg)
 {
-  char			*end;
-  unsigned long long	ms;
+  char	*end;
 
-  ms		= strtoull(arg, &end, 0);
-  delay.tv_sec	= ms/1000;
-  delay.tv_nsec	= (ms%1000)*1000000ul;
-  is_delay	= delay.tv_sec!=0 || delay.tv_nsec!=0;
-  return !end || *end || (delay.tv_sec*1000+delay.tv_nsec/1000000ul)!=ms;
+  delay_us	= strtoul(arg, &end, 0);
+  delay.tv_sec	= delay_us/1000;
+  delay.tv_nsec	= (delay_us%1000)*1000000ul;
+  is_delay	= delay_us;
+  delay_us	*= 1000;
+  return !end || *end || (delay.tv_sec*1000000ull+delay.tv_nsec/1000ul)!=delay_us;
 }
 
 static int
@@ -143,6 +158,8 @@ delay_trace(char **argv)
   int	retval, retval_set;
   char	*end;
 
+  /* If program is a PID and there are no args attach to the process.
+   */
   if (isdigit(argv[0][0]) && !argv[1] && (pid=strtol(argv[0], &end, 0))!=0 && end && !*end)
     {
       if (ptrace(PTRACE_ATTACH, pid, NULL, NULL))
@@ -154,17 +171,35 @@ delay_trace(char **argv)
     }
   else if ((pid=fork())==0)
     {
+      /* Fork a child and start tracing.
+       *
+       * I observed, that this creates a SIGTRAP, so this process is
+       * stopped for the wait below.
+       *
+       * If delay is set to 0 no trace is done.
+       */
       if (is_delay &&
 	  ptrace(PTRACE_TRACEME, 0, NULL, NULL))
 	ex(-1, "ptrace(PTRACE_TRACEME)");
+      /* Fork off the new process
+       */
       execvp(argv[0], argv);
-      ex(-1, argv[0]);
+      ex(-1, "fork failed: %s", argv[0]);
     }
+  else if (pid==(pid_t)-1)
+    ex(-1, "fork");
   else
     status("%ld started", (long)pid);
-  retval	= -1;
+
+  /* Start the wait loop
+   *
+   * The ptrace() delivers SIGTRAP each time the process is stopped.
+   * We use PTRACE_SYSCALL below to stop the process each time it does
+   * a syscall().  (This only happens if ptrace() is active.)
+   */
+  retval	= 129;	/* default in case of termsig/exitsig	*/
   retval_set	= 0;
-  for (loops=0;;loops++)
+  for (loops=1;;loops++)
     {
       pid_t	pid2;
 
@@ -174,12 +209,24 @@ delay_trace(char **argv)
 	{
 	  if (!errno || errno==EINTR || errno==EAGAIN)
 	    continue;
+	  /* Wait terminates with ECHILD in case there are no more
+	   * childs left.
+	   */
 	  if (errno==ECHILD)
 	    break;		/* We do not have any more child processes	*/
+	  /* Some undetermined error occurred.
+	   * Bail out is best here, I hope.
+	   */
 	  ex(-1, "waitpid");
 	}
       if (WIFEXITED(sta))
 	{
+	  /* Process terminated.
+	   *
+	   * If it's our child then remember the retval.  As more
+	   * childs might be traced (future!) we continue here.  The
+	   * wait above terminates anyways.
+	   */
 	  status("%ld exit %d", (long)pid2, WEXITSTATUS(sta));
 	  if (pid2==pid)
 	    {
@@ -189,28 +236,63 @@ delay_trace(char **argv)
 	}
       else if (WIFSIGNALED(sta))
 	{
+	  /* Process terminated due to signal.
+	   *
+	   * Usually you will see a warn "return value not set", as
+	   * the process is terminated without return value.
+	   */
 	  status("%ld exitsig %d", (long)pid2, WTERMSIG(sta));
 	}
       else if (WIFSTOPPED(sta))
 	{
+	  /* Process stopped due to ptrace() or signal
+	   *
+	   * If it's SIGTRAP it's ptrace() in our case, so do not
+	   * report in this case.  There shall be some way to
+	   * distinguish between ptrace() and "kill -TRAP", but I do
+	   * not know any.
+	   *
+	   * For other signals you will see that it's delivered, which
+	   * is not a bad "debugging sideeffect", I think ;)
+	   */
 	  if (WSTOPSIG(sta)!=SIGTRAP)
 	    status("%ld signal %d", (long)pid2, WSTOPSIG(sta));
+
+	  /* Now delay the processing
+	   */
+	  do_delay();
+	  /* EINTR is not defined according to the manual
+	   */
 	  if (ptrace(PTRACE_SYSCALL, pid2, NULL, (void *)(WSTOPSIG(sta)==SIGTRAP ? 0 : WSTOPSIG(sta))))
 	    ex(-1, "ptrace(PTRACE_SYSCALL)");
-	  do_delay();
 	  continue;
 	}
 #ifdef WCOREDUMP
+      /* There are some systems which tell about cores
+       *
+       * Implemented according to the manual.
+       */
       else if (WCOREDUMP(sta))
 	status("%ld core", (long)pid2);
 #endif
+      /* Well, hit me, but sometimes things happen, which I want to
+       * know about.
+       */
+      else
+	warn("unknown wait status 0x%x", sta);
     }
+  /* Warn if we came here without seeing a proper return value.
+   */
   if (!retval_set)
     warn("return value not set");
-  status("%ld loops, %ld sleeps, retval %d\n", loops, sleeps, retval);
-#if 0
-  ex(-1, "not yet");
-#endif
+  /* Report closing status
+   */
+  status("%ld loops, %ld sleeps, retval %d", loops, sleeps, retval);
+  /* Terminate with the return value of the forked process
+   *
+   * Well, this is true in the attached case, so we are stealing the
+   * return value in this case ;)
+   */
   return retval;
 }
 
@@ -219,8 +301,12 @@ delay_copy(void)
 {
   int	got;
   char	buf[BUFSIZ];
-  
-  while ((got=read(0, buf, sizeof buf))!=0)
+  long	loops, bytes;
+
+  /* Read the input blocks
+   */
+  bytes	= 0;
+  for (loops=1; (got=read(0, buf, sizeof buf))!=0; loops++)
     {
       int	max, i;
 
@@ -233,6 +319,12 @@ delay_copy(void)
 	    }
 	  ex(-1, "stdin");
 	}
+      bytes	+= got;
+
+      /* output lines delayed
+       *
+       * If is_delay is not set, output full blocks
+       */
       max	= is_delay ? 0 : got;
       for (i=0; i<got; )
 	{
@@ -240,6 +332,10 @@ delay_copy(void)
 
 	  while (max<got && buf[max++]!='\n');
 	  put	= write(1, buf+i, max-i);
+	  /* Delay after the write.
+	   *
+	   * I hate it to wait on the first round ;)
+	   */
 	  do_delay();
 	  if (put<0)
 	    {
@@ -248,10 +344,11 @@ delay_copy(void)
 	      ex(-1, "stdout");
 	    }
 	  if (!put)
-	    ex(-2, "EOF on stdout");
+	    ex(-2, "EOF on stdout (broken pipe)");
 	  i	+= put;
 	}
     }
+  status("%ld loops, %ld sleeps, bytes %ld", loops, sleeps, bytes);
   return 0;
 }
 
@@ -261,8 +358,10 @@ usage(const char *arg0)
   fprintf(stderr,
 	  "Usage: %s [-v] delay [pid|program [args..]]\n"
 	  "\t\tVersion " SLOWDOWN_VERSION " compiled " __DATE__ "\n"
-	  "\t-v\tverbose\n"
-	  "\tdelay is in milliseconds.\n"
+	  "\t-v\tverbose status output\n"
+	  "\t\tto suppress errors use 2>/dev/null\n"
+	  "\tdelay is in milliseconds.  delays below system counter\n"
+	  "\tresolution are compensated (through left out delays).\n"
 	  "\tIf program is missing it copies stdin to stdout\n"
 	  "\tand delays each line or read() (max. 4096 bytes).\n"
 	  "\tElse program is fork()ed, ptrace()d and each syscall of it\n"

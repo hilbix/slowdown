@@ -39,12 +39,16 @@ Note that there is a similar project at freshmeat:
      http://freshmeat.net/projects/slowdown/
 So if my version does not help you, perhaps the other can.
 
-BUGS:
------
+NOTES:
+------
 
 - If delay is below the resolution of the system timer, the waits are
-  over-estimated, so the overall delay is too high.  Perhaps a future
-  version fixes this.
+  over-estimated by the OS, so the delays are measured and some delay
+  calls are left out to compensate which results in a lower delay
+  count than one would expect.
+
+BUGS:
+-----
 
 - fork()s of the child processes are not followed.  This is the new
   child processes are not traced as well.  This shall be the default
@@ -54,12 +58,20 @@ BUGS:
   state, so it does stop running.  There shall be an automatic detach
   somehow.
 
+- SIGTSTP does not work correctly.  So if you attach to some process
+  in a shell and try to stop it (CTRL-Z), then this does not work, as
+  the SIGTSTP is no more delivered to the parent shell any more due to
+  the reparenting.
+
 -Tino
 webmaster@scylla-charybdis.com
 http://www.scylla-charybdis.com/
 
 $Log$
-Revision 1.2  2006-05-01 02:26:25  tino
+Revision 1.3  2006-05-02 04:14:11  tino
+mostly delay improvement, commit for dist
+
+Revision 1.2  2006/05/01 02:26:25  tino
 first dist
 
 Revision 1.1  2006/05/01 01:52:30  tino

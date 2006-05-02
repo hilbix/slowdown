@@ -1,0 +1,26 @@
+2006-05-02    <tino@firebird.03.softkill.net>
+
+	* slowdown.c (do_delay): delays are now measured, such that too
+	small delay counts (those below the system timer resolution) can
+	be compensated.
+
+	* README (NOTES): Note about the new improved delay method.
+
+	* slowdown.c (set_delay): changed such, that values are prepared
+	for improved delay routine.
+
+	* README (BUGS): SIGTSTP problems
+
+	* slowdown.c: bytes and loops added
+	(delay_trace): number of loops corrected
+	(delay_trace): commented and minor improvements
+	(delay_trace): default return changed to 129, as this is the usual
+	return in case a uncought exception happened.
+	(delay_trace): do_delay() moved before the PTRACE_SYSCALL to
+	recuce the concurrency.
+	(delay_trace): "unknown wait status" added
+
+2006-05-01    <tino@firebird.03.softkill.net>
+
+	* slowdown.c (delay_trace): fork() can return errors, now this is
+	checked
