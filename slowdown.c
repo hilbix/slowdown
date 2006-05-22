@@ -18,7 +18,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * $Log$
- * Revision 1.2  2006-05-02 04:14:11  tino
+ * Revision 1.3  2006-05-22 00:05:01  tino
+ * Mainly "slowdown 0 PID" feature added (and minor bugfix)
+ *
+ * Revision 1.2  2006/05/02 04:14:11  tino
  * mostly delay improvement, commit for dist
  *
  * Revision 1.1  2006/05/01 01:52:30  tino
@@ -53,7 +56,7 @@ ex(int ret, const char *s, ...)
   int		e;
 
   e	= errno;
-  fprintf(stderr, "[%ld] %s error: ", (long)mypid, arg0);
+  fprintf(stderr, "[%d] %s error: ", mypid, arg0);
   va_start(list, s);
   vfprintf(stderr, s, list);
   va_end(list);
@@ -66,7 +69,7 @@ warn(const char *s, ...)
 {
   va_list	list;
 
-  fprintf(stderr, "[%ld] %s warn: ", (long)mypid, arg0);
+  fprintf(stderr, "[%d] %s warn: ", mypid, arg0);
   va_start(list, s);
   vfprintf(stderr, s, list);
   va_end(list);
@@ -81,7 +84,7 @@ status(const char *s, ...)
   if (!verbose)
     return;
 
-  fprintf(stderr, "[%ld] %s status: ", (long)mypid, arg0);
+  fprintf(stderr, "[%d] %s status: ", mypid, arg0);
   va_start(list, s);
   vfprintf(stderr, s, list);
   va_end(list);
@@ -144,11 +147,13 @@ set_delay(const char *arg)
   delay_us	= strtoul(arg, &end, 0);
   delay.tv_sec	= delay_us/1000;
   delay.tv_nsec	= (delay_us%1000)*1000000ul;
-  is_delay	= delay_us;
+  is_delay	= delay_us!=0;
   delay_us	*= 1000;
   return !end || *end || (delay.tv_sec*1000000ull+delay.tv_nsec/1000ul)!=delay_us;
 }
 
+/* This routine is too long
+ */
 static int
 delay_trace(char **argv)
 {
@@ -157,6 +162,15 @@ delay_trace(char **argv)
   long	loops;
   int	retval, retval_set;
   char	*end;
+  int	detach;
+
+  /* Detaching is not so easy as one might think.
+   * As we are doing asynchronous things, we just cannot detach,
+   * as there may be a signal which then is spuriously delivered
+   * to the old parent if we detach.  So we must wait until we
+   * got the process stopped such that we can detach cleanly.
+   */
+  detach	= 0;
 
   /* If program is a PID and there are no args attach to the process.
    */
@@ -168,6 +182,10 @@ delay_trace(char **argv)
       /* Just in case, revive process
        */
       ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
+
+      /* Try to detach cleanly in case we had a stopped process
+       */
+      detach	= !is_delay;
     }
   else if ((pid=fork())==0)
     {
@@ -257,6 +275,16 @@ delay_trace(char **argv)
 	   */
 	  if (WSTOPSIG(sta)!=SIGTRAP)
 	    status("%ld signal %d", (long)pid2, WSTOPSIG(sta));
+
+	  /* Do we want to detach cleanly?
+	   */
+          else if (detach)
+            {
+	      if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
+		ex(-1, "ptrace(PTRACE_DETACH)");
+ 	      status("%ld detached", (long)pid);
+	      break;
+	    }
 
 	  /* Now delay the processing
 	   */
@@ -367,6 +395,8 @@ usage(const char *arg0)
 	  "\tElse program is fork()ed, ptrace()d and each syscall of it\n"
 	  "\tis delayed as given.\n"
 	  "\tIf program has no args and is a PID the PID is attached.\n"
+	  "\tIf you terminate slowdown with an attached PID and the\n"
+	  "\tand the program hangs, try 'slowdown 0 PID'.\n"
 	  , arg0
 	  );
 }
@@ -376,6 +406,7 @@ setarg0(const char *s)
 {
   char	*tmp;
 
+  mypid	= getpid();
   arg0	= s;
   if ((tmp=strrchr(arg0, '/'))!=0)
     arg0	= tmp+1;
@@ -384,7 +415,6 @@ setarg0(const char *s)
 int
 main(int argc, char **argv)
 {
-  mypid	= getpid();
   setarg0(argv[0]);
   verbose	= 0;
   if (argc>1 && !strcmp(argv[1], "-v"))

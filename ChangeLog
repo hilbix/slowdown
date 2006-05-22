@@ -1,3 +1,12 @@
+2006-05-22    <tino@firebird.03.softkill.net>
+
+	* slowdown.c (set_delay): Bug removed if you happen to set delay
+	of exactly 2^32 ms.
+	(delay_trace): Reparenting is undone in case of PTRACE_ATTACH was
+	done.  Hopefully.  So with "slowdown 1 pid" you can start the
+	slowdown, then terminate the slowdown and do a "slowdown 0 pid" to
+	re-awake it.
+
 2006-05-02    <tino@firebird.03.softkill.net>
 
 	* slowdown.c (do_delay): delays are now measured, such that too
