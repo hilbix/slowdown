@@ -10,8 +10,9 @@ traced state.  You now can recover from this using
 
 slowdown 0 PID
 
-which immediately (nearly) undoes the trace effect.  Note that it's
-likely that you don't see this effect easily if you use
+which undoes the trace effect and (nearly) immediately returns.  Note
+that it's likely that you don't see this hanging effect easily if you
+use
 
 slowdown 1 PID
 
