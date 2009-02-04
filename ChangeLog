@@ -1,3 +1,9 @@
+2009-02-04  Valentin Hilbig  <tino@zoo.03.softkill.net>
+
+	* slowdown.c (set_delay): keep delay in sane values (slowdown to
+	1h per syscall shall be high enough).  This prevents against using
+	-1 as slowdown value (as you are used to it with command nice).
+
 2006-05-22    <tino@firebird.03.softkill.net>
 
 	* slowdown.c (set_delay): Bug removed if you happen to set delay

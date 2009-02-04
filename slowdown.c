@@ -1,23 +1,27 @@
 /* $Header$
  *
- * Copyright (C)2006 Valentin Hilbig, webmaster@scylla-charybdis.com
+ * Copyright (C)2006-2009 Valentin Hilbig <webmaster@scylla-charybdis.com>
  * This shall be independent of tinolib.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+ * USA
  *
  * $Log$
+ * Revision 1.4  2009-02-04 14:53:43  tino
+ * Insane delay values now give errors
+ *
  * Revision 1.3  2006-05-22 00:05:01  tino
  * Mainly "slowdown 0 PID" feature added (and minor bugfix)
  *
@@ -91,6 +95,50 @@ status(const char *s, ...)
   fprintf(stderr, "\n");
 }
 
+#if 0
+/* Switch of slowdown, send SIGTERM to child and terminate.
+ *
+ * This allows the child to react on SIGTERM, too.
+ */
+static void
+sig_kill(void)
+{
+  000;
+}
+
+/* Set slowdown value to 0 (no slowdown)
+ *
+ * This allows the child to react on SIGHUP, too.  This sends no
+ * SIGHUP to the child!
+ */
+static void
+sig_hup(void)
+{
+  000;
+}
+
+/* Increment slowdown by 1 ms
+ *
+ * With SIGUSR1 and SIGUSR2 you can "pulse in" arbitrary values to
+ * slowdown.  Just give a SIGHUP first.
+ */
+static void
+sig_usr1(void)
+{
+  000;
+}
+
+/* Double slowdown,
+ *
+ * If value is 0 this presets to the user given value
+ */
+static void
+sig_usr2(void)
+{
+  000;
+}
+#endif
+
 static int			is_delay;
 static struct timespec		delay;
 static unsigned long long	delay_us;
@@ -144,12 +192,13 @@ set_delay(const char *arg)
 {
   char	*end;
 
+  errno		= EOVERFLOW;
   delay_us	= strtoul(arg, &end, 0);
   delay.tv_sec	= delay_us/1000;
   delay.tv_nsec	= (delay_us%1000)*1000000ul;
   is_delay	= delay_us!=0;
   delay_us	*= 1000;
-  return !end || *end || (delay.tv_sec*1000000ull+delay.tv_nsec/1000ul)!=delay_us;
+  return !end || *end || (delay.tv_sec*1000000ull+delay.tv_nsec/1000ul)!=delay_us || delay.tv_sec>3600;
 }
 
 /* This routine is too long

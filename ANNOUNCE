@@ -1,21 +1,4 @@
-Minor bugfix and added "slowdown 0 PID" to detach a "hung" process.
+Delay must be in sane area now, a delay higher than 1 hour now is
+rejected.
 
-If you attach to a process with something like
-
-slowdown 100 PID
-
-and then kill slowdown with ^C, this very likely leaves a hung PID,
-because slowdown (not yet) detaches the PID and leaves it in the
-traced state.  You now can recover from this using
-
-slowdown 0 PID
-
-which undoes the trace effect and (nearly) immediately returns.  Note
-that it's likely that you don't see this hanging effect easily if you
-use
-
-slowdown 1 PID
-
-as the minimal timer resolution usually is somewhat around 15, so a
-faster timer is faked such that it's likely that you do not kill
-slowdown when the child is in traced state.
+Install path changed to /usr/local/bin/

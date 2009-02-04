@@ -22,6 +22,9 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 # $Log$
+# Revision 1.2  2009-02-04 14:53:43  tino
+# Insane delay values now give errors
+#
 # Revision 1.1  2006-05-01 01:52:30  tino
 # A first version which works
 #
@@ -42,7 +45,7 @@ ADD_LDFLAGS=
    TINOCOPY=
 #    TINOINC=tino_common.h
 #    TINOLIB=tino/lib.h
-#INSTALLPATH=/usr/local
+ INSTALLPATH=/usr/local
 # DBG_CFLAGS=
 #DBG_LDFLAGS=
 # DBG_LDLIBS=-lefence
