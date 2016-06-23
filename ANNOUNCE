@@ -1,4 +1,2 @@
-Delay must be in sane area now, a delay higher than 1 hour now is
-rejected.
-
-Install path changed to /usr/local/bin/
+Announcements are now in the git commit log:
+git log --follow VERSION
