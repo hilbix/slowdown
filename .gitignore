@@ -1,5 +1,4 @@
-Makefile
-Makefile.md5
 *.d
+*.o
 slowdown
 slowdown_version.h
