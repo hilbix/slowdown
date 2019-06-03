@@ -1,3 +1,5 @@
+[![Build Status](https://api.cirrus-ci.com/github/hilbix/slowdown.svg)](https://cirrus-ci.com/github/hilbix/slowdown/master)
+
 # slowdown
 
 	git clone https://github.com/hilbix/slowdown
