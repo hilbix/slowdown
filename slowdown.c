@@ -1,35 +1,9 @@
-/* $Header$
+/* Slowdown programs based on syscalls.
  *
- * Copyright (C)2006-2009 Valentin Hilbig <webmaster@scylla-charybdis.com>
- * This shall be independent of tinolib.
+ * This is independent of tinolib (subdir tino/)
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
- * USA
- *
- * $Log$
- * Revision 1.4  2009-02-04 14:53:43  tino
- * Insane delay values now give errors
- *
- * Revision 1.3  2006-05-22 00:05:01  tino
- * Mainly "slowdown 0 PID" feature added (and minor bugfix)
- *
- * Revision 1.2  2006/05/02 04:14:11  tino
- * mostly delay improvement, commit for dist
- *
- * Revision 1.1  2006/05/01 01:52:30  tino
- * A first version which works
+ * This Works is placed under the terms of the Copyright Less License,
+ * see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
  */
 
 #include <stdio.h>
@@ -266,6 +240,8 @@ delay_trace(char **argv)
    */
   retval	= 129;	/* default in case of termsig/exitsig	*/
   retval_set	= 0;
+  if (ptrace(PTRACE_SETOPTIONS, pid, NULL, PTRACE_O_TRACESYSGOOD))
+    ex(-1, "ptrace(PTRACE_SETOPTIONS)");
   for (loops=1;;loops++)
     {
       pid_t	pid2;
@@ -322,16 +298,16 @@ delay_trace(char **argv)
 	   * For other signals you will see that it's delivered, which
 	   * is not a bad "debugging sideeffect", I think ;)
 	   */
-	  if (WSTOPSIG(sta)!=SIGTRAP)
+	  if (WSTOPSIG(sta)!=(SIGTRAP|0x80))
 	    status("%ld signal %d", (long)pid2, WSTOPSIG(sta));
 
 	  /* Do we want to detach cleanly?
 	   */
-          else if (detach)
-            {
+	  else if (detach)
+	    {
 	      if (ptrace(PTRACE_DETACH, pid, NULL, NULL))
 		ex(-1, "ptrace(PTRACE_DETACH)");
- 	      status("%ld detached", (long)pid);
+	      status("%ld detached", (long)pid);
 	      break;
 	    }
 
@@ -340,7 +316,7 @@ delay_trace(char **argv)
 	  do_delay();
 	  /* EINTR is not defined according to the manual
 	   */
-	  if (ptrace(PTRACE_SYSCALL, pid2, NULL, (void *)(WSTOPSIG(sta)==SIGTRAP ? 0 : WSTOPSIG(sta))))
+	  if (ptrace(PTRACE_SYSCALL, pid2, NULL, ((WSTOPSIG(sta) & 0x80) ? 0 : WSTOPSIG(sta))))
 	    ex(-1, "ptrace(PTRACE_SYSCALL)");
 	  continue;
 	}
@@ -444,7 +420,7 @@ usage(const char *arg0)
 	  "\tElse program is fork()ed, ptrace()d and each syscall of it\n"
 	  "\tis delayed as given.\n"
 	  "\tIf program has no args and is a PID the PID is attached.\n"
-	  "\tIf you terminate slowdown with an attached PID and the\n"
+	  "\tIf you terminate slowdown with an attached PID\n"
 	  "\tand the program hangs, try 'slowdown 0 PID'.\n"
 	  , arg0
 	  );
