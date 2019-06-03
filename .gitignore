@@ -1,4 +1,3 @@
 *.d
 *.o
 slowdown
-slowdown_version.h
