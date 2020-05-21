@@ -350,7 +350,6 @@ ptrace__event(struct trace_info *inf)
 static void
 ptrace__loop(struct trace_info *inf)
 {
-  long	loops;
   pid_t	mainpid;
   char	c;
 
@@ -362,8 +361,9 @@ ptrace__loop(struct trace_info *inf)
   inf->firststop	= 1;
 
   c			= 0;
-  for (loops=1;;loops++)
+  for (;;)
     {
+      inf->loops++;
       if (debug && c)
         fputc(c, stderr);
       c		= '*';
