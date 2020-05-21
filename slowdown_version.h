@@ -1,1 +1,1 @@
-#define SLOWDOWN_VERSION "0.3.0"
+#define SLOWDOWN_VERSION "0.3.0+dev"
